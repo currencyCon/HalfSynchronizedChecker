@@ -8,6 +8,8 @@ using Microsoft.CodeAnalysis.CodeFixes;
 using Microsoft.CodeAnalysis.CodeActions;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Editing;
+using Microsoft.CodeAnalysis.MSBuild;
 using Microsoft.CodeAnalysis.Rename;
 
 namespace HalfSynchronizedChecker
@@ -32,35 +34,60 @@ namespace HalfSynchronizedChecker
             var diagnostic = context.Diagnostics.First();
             var diagnosticSpan = diagnostic.Location.SourceSpan;
 
-            // Find the type declaration identified by the diagnostic.
-            var declaration = root.FindToken(diagnosticSpan.Start).Parent.AncestorsAndSelf().OfType<TypeDeclarationSyntax>().First();
-
-            // Register a code action that will invoke the fix.
-            context.RegisterCodeFix(
-                CodeAction.Create(
-                    title: Title,
-                    createChangedSolution: c => MakeUppercaseAsync(context.Document, declaration, c),
-                    equivalenceKey: Title),
-                diagnostic);
+            var syntaxNode = root.FindToken(diagnosticSpan.Start).Parent;
+            if (syntaxNode is MethodDeclarationSyntax)
+            {
+                context.RegisterCodeFix(
+                    CodeAction.Create(Title, c => SynchronizeMethod(context.Document, (MethodDeclarationSyntax) syntaxNode, c), Title), diagnostic);
+            }
+            if (syntaxNode is PropertyDeclarationSyntax)
+            {
+                context.RegisterCodeFix(
+                    CodeAction.Create(Title, c => SynchronizeProperty(context.Document, (PropertyDeclarationSyntax)syntaxNode, c), Title), diagnostic);
+            }
         }
 
-        private async Task<Solution> MakeUppercaseAsync(Document document, TypeDeclarationSyntax typeDecl, CancellationToken cancellationToken)
+        private async Task<Document> SynchronizeProperty(Document document, PropertyDeclarationSyntax property,
+    CancellationToken cancellationToken)
         {
-            // Compute new uppercase name.
-            var identifierToken = typeDecl.Identifier;
-            var newName = identifierToken.Text.ToUpperInvariant();
+            var x = property.AccessorList;
+            PropertyDeclarationSyntax blu = property;
+            var root = await document.GetSyntaxRootAsync(cancellationToken);
+            SyntaxList<AccessorDeclarationSyntax> newDecl = new SyntaxList<AccessorDeclarationSyntax>();
+            foreach (var accessorDeclarationSyntax in x.Accessors)
+            {
+                var openParans = SyntaxFactory.Token(SyntaxKind.OpenParenToken);
+                var closingParans = SyntaxFactory.Token(SyntaxKind.CloseParenToken);
+                var thisExpression = SyntaxFactory.ThisExpression();
+                var lockStatement = SyntaxFactory.LockStatement(SyntaxFactory.Token(SyntaxKind.LockKeyword),
+                    openParans,
+                    thisExpression,
+                    closingParans, accessorDeclarationSyntax.Body);
+                newDecl.Add(accessorDeclarationSyntax.ReplaceNode(accessorDeclarationSyntax.Body, lockStatement));
+                blu = property.ReplaceNode(accessorDeclarationSyntax,
+                    accessorDeclarationSyntax.ReplaceNode(accessorDeclarationSyntax.Body, lockStatement));
 
-            // Get the symbol representing the type to be renamed.
-            var semanticModel = await document.GetSemanticModelAsync(cancellationToken);
-            var typeSymbol = semanticModel.GetDeclaredSymbol(typeDecl, cancellationToken);
+            }
+            return document.WithSyntaxRoot(root.ReplaceNode(property, blu));
+        }
 
-            // Produce a new solution that has all references to that type renamed, including the declaration.
-            var originalSolution = document.Project.Solution;
-            var optionSet = originalSolution.Workspace.Options;
-            var newSolution = await Renamer.RenameSymbolAsync(document.Project.Solution, typeSymbol, newName, optionSet, cancellationToken).ConfigureAwait(false);
+        private async Task<Document> SynchronizeMethod(Document document, MethodDeclarationSyntax method,
+            CancellationToken cancellationToken)
+        {
+            var root = await document.GetSyntaxRootAsync(cancellationToken);
+            var body = method.Body;
+            var openParans = SyntaxFactory.Token(SyntaxKind.OpenParenToken);
+            var closingParans = SyntaxFactory.Token(SyntaxKind.CloseParenToken);
+            var thisExpression = SyntaxFactory.ThisExpression();
+            var lockStatement = SyntaxFactory.LockStatement(SyntaxFactory.Token(SyntaxKind.LockKeyword),
+                openParans,
+                thisExpression,
+                closingParans, body);
+            var l =
+                SyntaxFactory.Block(lockStatement);
+            var newMeth = method.ReplaceNode(method, method.WithBody(l));
+            return document.WithSyntaxRoot(root.ReplaceNode(method, newMeth));
 
-            // Return the new solution with the now-uppercase type name.
-            return newSolution;
         }
     }
 }

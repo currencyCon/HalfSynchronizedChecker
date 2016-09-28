@@ -80,6 +80,15 @@ namespace HalfSynchronizedChecker {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to The {0} {1} is also used in another synchronized Method . Consider synchronizing also this one..
+        /// </summary>
+        internal static string AnalyzerMessageFormatHalfSynchronized {
+            get {
+                return ResourceManager.GetString("AnalyzerMessageFormatHalfSynchronized", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to The Element is not synchronized.
         /// </summary>
         internal static string AnalyzerTitle {

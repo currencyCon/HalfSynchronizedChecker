@@ -125,6 +125,10 @@
     <value>The {0} {1} is used in a synchronized {2} . Consider synchronizing it.</value>
     <comment>The format-able message the diagnostic displays.</comment>
   </data>
+  <data name="AnalyzerMessageFormatHalfSynchronized" xml:space="preserve">
+    <value>The {0} {1} is also used in another synchronized Method . Consider synchronizing also this one.</value>
+    <comment>The format-able message the diagnostic displays.</comment>
+  </data>
   <data name="AnalyzerTitle" xml:space="preserve">
     <value>The Element is not synchronized</value>
     <comment>The title of the diagnostic.</comment>
