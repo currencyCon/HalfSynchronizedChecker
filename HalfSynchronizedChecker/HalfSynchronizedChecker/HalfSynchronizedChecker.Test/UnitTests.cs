@@ -2,9 +2,7 @@
 using Microsoft.CodeAnalysis.CodeFixes;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using System;
 using TestHelper;
-using HalfSynchronizedChecker;
 
 namespace HalfSynchronizedChecker.Test
 {
@@ -12,63 +10,142 @@ namespace HalfSynchronizedChecker.Test
     public class UnitTest : CodeFixVerifier
     {
 
-        //No diagnostics expected to show up
         [TestMethod]
-        public void TestMethod1()
+        public void TestDetectsUnsynchronizedProperty()
         {
-            var test = @"";
+            const string test = @"
+                namespace Test
+                {
+                    class TestProgram
+                    {
+                        public int z { get; set; }
 
-            VerifyCSharpDiagnostic(test);
-        }
-
-        //Diagnostic and CodeFix both triggered and checked for
-        [TestMethod]
-        public void TestMethod2()
-        {
-            var test = @"
-    using System;
-    using System.Collections.Generic;
-    using System.Linq;
-    using System.Text;
-    using System.Threading.Tasks;
-    using System.Diagnostics;
-
-    namespace ConsoleApplication1
-    {
-        class TypeName
-        {   
-        }
-    }";
+                        public void m()
+                        {
+                            lock(this)
+                            {
+                                z = 2;
+                            }
+                        }
+                    }
+                }
+            ";
             var expected = new DiagnosticResult
             {
-                Id = "HalfSynchronizedChecker",
-                Message = String.Format("Type name '{0}' contains lowercase letters", "TypeName"),
+                Id = HalfSynchronizedCheckerAnalyzer.InnerLockingDiagnosticId,
+                Message = "The Property z is used in a synchronized member. Consider synchronizing it.",
                 Severity = DiagnosticSeverity.Warning,
                 Locations =
                     new[] {
-                            new DiagnosticResultLocation("Test0.cs", 11, 15)
+                            new DiagnosticResultLocation("Test0.cs", 6, 25)
                         }
             };
 
             VerifyCSharpDiagnostic(test, expected);
+        }
 
-            var fixtest = @"
-    using System;
-    using System.Collections.Generic;
-    using System.Linq;
-    using System.Text;
-    using System.Threading.Tasks;
-    using System.Diagnostics;
+        [TestMethod]
+        public void TestDetectsHalfSynchronizedProperty()
+        {
+            const string test = @"
+                namespace Test
+                {
+                    class TestProgram
+                    {
+                        public int z { get; set; }
 
-    namespace ConsoleApplication1
+                        public void m2() {
+                            z = 3;
+                        }
+                        public void m()
+                        {
+                            lock(this)
+                            {
+                                z = 2;
+                            }
+                        }
+                    }
+                }
+            ";
+            var expected = new [] {
+                new DiagnosticResult
+            {
+                Id = HalfSynchronizedCheckerAnalyzer.InnerLockingDiagnosticId,
+                Message = "The Property z is used in a synchronized member. Consider synchronizing it.",
+                Severity = DiagnosticSeverity.Warning,
+                Locations =
+                    new[] {
+                            new DiagnosticResultLocation("Test0.cs", 6, 25)
+                        }
+            },
+                new DiagnosticResult
+            {
+                Id = HalfSynchronizedCheckerAnalyzer.HalfSynchronizedChildDiagnosticId,
+                Message = "The Property z is also used in another synchronized Method . Consider synchronizing also this one.",
+                Severity = DiagnosticSeverity.Warning,
+                Locations =
+                    new[] {
+                            new DiagnosticResultLocation("Test0.cs", 8, 25)
+                        }
+            }
+            } ;
+
+            VerifyCSharpDiagnostic(test, expected);
+        }
+
+        [TestMethod]
+        public void TestProvidesSimpleHalfSynchronizedFix()
+        {
+            const string test = 
+@"
+namespace Test
+{
+    class TestProgram
     {
-        class TYPENAME
-        {   
-        }
-    }";
-            VerifyCSharpFix(test, fixtest);
+        public int z { get; set; }
+
+
+        public void m()
+        {
+            lock(this)
+            {
+                z = 2;
+            }
         }
 
+        public void m2() {
+            z = 3;
+        }
+    }
+}
+";
+            const string fixTest = 
+@"
+namespace Test
+{
+    class TestProgram
+    {
+        public int z { get; set; }
+
+        public void m()
+        {
+            lock(this)
+            {
+                z = 2;
+            }
+        }
+
+        public void m2() {
+            lock(this)
+            {
+                z = 3;
+            }
+        }
+    }
+}
+";
+            VerifyCSharpFix(test, fixTest, warningId:HalfSynchronizedCheckerAnalyzer.HalfSynchronizedChildDiagnosticId);
+        }
         protected override CodeFixProvider GetCSharpCodeFixProvider()
         {
             return new HalfSynchronizedCheckerCodeFixProvider();

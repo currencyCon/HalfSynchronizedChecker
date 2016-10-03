@@ -36,7 +36,7 @@ namespace HalfSynchronizedChecker.AnalyzationHelpers
             return unsyncedProperties;
         }
 
-        private static List<SyntaxToken> GetIdentifiersUsedInLocks(IEnumerable<LockStatementSyntax> locksStatementsOfProperties)
+        private static IEnumerable<SyntaxToken> GetIdentifiersUsedInLocks(IEnumerable<LockStatementSyntax> locksStatementsOfProperties)
         {
             var identifiersUsedInLockStatements =
                 locksStatementsOfProperties.ToList()
@@ -52,16 +52,18 @@ namespace HalfSynchronizedChecker.AnalyzationHelpers
             return synchronizedElements.SelectMany(a => a.DescendantNodes().OfType<LockStatementSyntax>()).ToList();
         }
 
-        public static List<SyntaxToken> GetIdentifiersInLockStatements(IEnumerable<SyntaxNode> synchronizedMethods)
+        public static IEnumerable<string> GetIdentifiersInLockStatements(IEnumerable<SyntaxNode> synchronizedMethods)
         {
             var locksStatementsOfProperties = GetLockStatements(synchronizedMethods);
-            return GetIdentifiersUsedInLocks(locksStatementsOfProperties);
+            return GetIdentifiersUsedInLocks(locksStatementsOfProperties).Select(e => e.Text);
         }
 
         public static IEnumerable<PropertyDeclarationSyntax> GetPropertiesInSynchronizedMethods(IEnumerable<MethodDeclarationSyntax> synchronizedMethods, IEnumerable<PropertyDeclarationSyntax> properties)
         {
             var x = GetIdentifiersInLockStatements(synchronizedMethods);
-            return properties.Where(e => x.Select(a => a.Text).Contains(e.Identifier.Text));
+            return properties.Where(e => x.Contains(e.Identifier.Text));
         }
+
+
     }
 }

@@ -1,17 +1,18 @@
 ﻿
 
 using System.Collections.Generic;
+using System.Linq;
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace HalfSynchronizedChecker.AnalyzationHelpers
 {
     public class HalfSynchronizedClassRepresentation
     {
-        public HalfSynchronizedClassRepresentation(IList<PropertyDeclarationSyntax> properties,
-            IList<MethodDeclarationSyntax> methods)
+        public HalfSynchronizedClassRepresentation(SyntaxNode classDeclaration)
         {
-            Properties = properties;
-            Methods = methods;
+            Properties = classDeclaration.DescendantNodes().OfType<PropertyDeclarationSyntax>().ToList();
+            Methods = classDeclaration.DescendantNodes().OfType<MethodDeclarationSyntax>().ToList();
             SynchronizedProperties = SyntaxNodeFilter.GetSynchronizedProperties(Properties);
             SynchronizedMethods = SyntaxNodeFilter.GetSynchronizedMethods(Methods);
             UnsynchronizedProperties = SyntaxNodeFilter.GetUnsynchronizedProperties(Properties);
@@ -28,6 +29,10 @@ namespace HalfSynchronizedChecker.AnalyzationHelpers
         public IEnumerable<MethodDeclarationSyntax> UnsynchronizedMethods { get; set; }
         public IEnumerable<PropertyDeclarationSyntax> UnsynchronizedPropertiesInSynchronizedMethods { get; set; }
 
-
+        public IEnumerable<string> GetIdentifiersInLockStatements()
+        {
+            return SyntaxNodeFilter.GetIdentifiersInLockStatements(SynchronizedProperties)
+                .Concat(SyntaxNodeFilter.GetIdentifiersInLockStatements(SynchronizedMethods));
+        }
     }
 }

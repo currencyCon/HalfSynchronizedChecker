@@ -71,7 +71,7 @@ namespace HalfSynchronizedChecker {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to The {0} {1} is used in a synchronized {2} . Consider synchronizing it..
+        ///   Looks up a localized string similar to The {0} {1} is used in a synchronized member. Consider synchronizing it..
         /// </summary>
         internal static string AnalyzerMessageFormat {
             get {

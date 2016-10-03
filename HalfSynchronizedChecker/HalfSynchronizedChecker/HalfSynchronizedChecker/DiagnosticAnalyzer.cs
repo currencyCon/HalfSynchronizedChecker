@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using HalfSynchronizedChecker.AnalyzationHelpers;
@@ -12,8 +11,8 @@ namespace HalfSynchronizedChecker
     [DiagnosticAnalyzer(LanguageNames.CSharp)]
     public class HalfSynchronizedCheckerAnalyzer : DiagnosticAnalyzer
     {
-        public const string DiagnosticId = "HSC001";
-
+        public const string InnerLockingDiagnosticId = "HSC001";
+        public const string HalfSynchronizedChildDiagnosticId = "HSC002";
         private static readonly LocalizableString Title = new LocalizableResourceString(nameof(Resources.AnalyzerTitle), Resources.ResourceManager, typeof(Resources));
         private static readonly LocalizableString MessageFormat = new LocalizableResourceString(nameof(Resources.AnalyzerMessageFormat), Resources.ResourceManager, typeof(Resources));
         private static readonly LocalizableString MessageFormatHalfSynchronized = new LocalizableResourceString(nameof(Resources.AnalyzerMessageFormatHalfSynchronized), Resources.ResourceManager, typeof(Resources));
@@ -21,10 +20,10 @@ namespace HalfSynchronizedChecker
         private static readonly LocalizableString Description = new LocalizableResourceString(nameof(Resources.AnalyzerDescription), Resources.ResourceManager, typeof(Resources));
         private const string Category = "Synchronization";
 
-        private static readonly DiagnosticDescriptor Rule = new DiagnosticDescriptor(DiagnosticId, Title, MessageFormat, Category, DiagnosticSeverity.Warning, isEnabledByDefault: true, description: Description);
-        private static readonly DiagnosticDescriptor RuleHalfSynchronized = new DiagnosticDescriptor(DiagnosticId, Title, MessageFormatHalfSynchronized, Category, DiagnosticSeverity.Warning, isEnabledByDefault: true, description: Description);
+        private static readonly DiagnosticDescriptor Rule = new DiagnosticDescriptor(InnerLockingDiagnosticId, Title, MessageFormat, Category, DiagnosticSeverity.Warning, isEnabledByDefault: true, description: Description);
+        private static readonly DiagnosticDescriptor RuleHalfSynchronized = new DiagnosticDescriptor(HalfSynchronizedChildDiagnosticId, Title, MessageFormatHalfSynchronized, Category, DiagnosticSeverity.Warning, isEnabledByDefault: true, description: Description);
 
-        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => ImmutableArray.Create(Rule);
+        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => ImmutableArray.Create(Rule, RuleHalfSynchronized);
 
         public override void Initialize(AnalysisContext context)
         {
@@ -42,84 +41,41 @@ namespace HalfSynchronizedChecker
                 return;
             }
 
-            var properties =
-                (IList<PropertyDeclarationSyntax>)
-                    classDeclaration.DescendantNodes().OfType<PropertyDeclarationSyntax>().ToList();
-            var methods = (IList<MethodDeclarationSyntax>)
-                classDeclaration.DescendantNodes().OfType<MethodDeclarationSyntax>().ToList();
-            if (!properties.Any() && !methods.Any())
-            {
-                return;
-            }
-
-            var halfSynchronizedClass = new HalfSynchronizedClassRepresentation(properties, methods);
+            var halfSynchronizedClass = new HalfSynchronizedClassRepresentation(classDeclaration);
             if (!halfSynchronizedClass.SynchronizedMethods.Any() && !halfSynchronizedClass.SynchronizedProperties.Any())
             {
                 return;
             }
-            InspectValues(context, halfSynchronizedClass);
-        }
 
-        private static void InspectValues(SyntaxNodeAnalysisContext context,
-            HalfSynchronizedClassRepresentation halfSynchronizedClass)
-        {
-            HandleUnsynchronizedMethodsWithHalfSynchronizedProperties(context, halfSynchronizedClass);
-            HandleUnsynchronizedPropertiesWithSynchronizedProperties(context, halfSynchronizedClass);
-            HandleUnsynchronizedPropertiesWithSynchronizedMethods(context, halfSynchronizedClass);
-            HandleUnsynchronizedMethodsWithSynchronizedMethods(context, halfSynchronizedClass);
-            HandleUnsynchronizedMethodsWithSynchronizedProperties(context, halfSynchronizedClass);
-        }
-
-        private static void HandleUnsynchronizedMethodsWithHalfSynchronizedProperties(SyntaxNodeAnalysisContext context, HalfSynchronizedClassRepresentation halfSynchronizedClass)
-        {
-            var methodsWithHalfSynchronizedProperties = SynchronizationInspector.GetMethodsWithHalfSynchronizedProperties(halfSynchronizedClass);
-            foreach (var methodWithHalfSynchronizedProperties in methodsWithHalfSynchronizedProperties)
+            if (!halfSynchronizedClass.Properties.Any() && !halfSynchronizedClass.Methods.Any())
             {
-                var propUsed = SynchronizationInspector.GetHalSynchronizedPropertyUsed(halfSynchronizedClass, methodWithHalfSynchronizedProperties);
-                ReportHalfSynchronizationDiagnostic(context, methodWithHalfSynchronizedProperties, "Property", propUsed.Identifier.Text);
+                return;
             }
-        }
-
-        private static void HandleUnsynchronizedMethodsWithSynchronizedMethods(SyntaxNodeAnalysisContext context, HalfSynchronizedClassRepresentation halfSynchronizedClass)
-        {
-            var methodsWithSynchronizedMethods = SynchronizationInspector.GetMethodsWithSynchronizedMethods(halfSynchronizedClass);
-            foreach (var methodsWithSynchronizedMethod in methodsWithSynchronizedMethods)
+            if (root is PropertyDeclarationSyntax)
             {
-                ReportSynchronizationDiagnostic(context, methodsWithSynchronizedMethod, CustomDiagnosticsFormatter.GetKindRepresentation(methodsWithSynchronizedMethod.Kind().ToString()), methodsWithSynchronizedMethod.Identifier.Text, CustomDiagnosticsFormatter.GetKindRepresentation(methodsWithSynchronizedMethod.Kind().ToString()));
+                var property = (PropertyDeclarationSyntax) root;
+                if (SynchronizationInspector.PropertyNeedsSynchronization(property,
+                    halfSynchronizedClass))
+                {
+                    ReportSynchronizationDiagnostic(context, property, "Property", property.Identifier.Text);
+
+                }
             }
-        }
-
-        private static void HandleUnsynchronizedMethodsWithSynchronizedProperties(SyntaxNodeAnalysisContext context,HalfSynchronizedClassRepresentation halfSynchronizedClass)
-        {
-            var methodsWithSynchronizedProperties = SynchronizationInspector.GetMethodsWithSynchronizedProperties(halfSynchronizedClass);
-            foreach (var methodWithSynchronizedProperties in methodsWithSynchronizedProperties)
+            else if (root is MethodDeclarationSyntax)
             {
-                ReportSynchronizationDiagnostic(context, methodWithSynchronizedProperties, "Method", methodWithSynchronizedProperties.Identifier.Text, "Property");
-            }
-        }
-
-        private static void HandleUnsynchronizedPropertiesWithSynchronizedProperties(SyntaxNodeAnalysisContext context, HalfSynchronizedClassRepresentation halfSynchronizedClass)
-        {
-            var propertiesWithSynchronizedProperties = SynchronizationInspector.GetPropertiesWithSynchronizedProperties(halfSynchronizedClass);
-            foreach (var propertiyWithSynchronizedProperties in propertiesWithSynchronizedProperties)
-            {
-                ReportSynchronizationDiagnostic(context, propertiyWithSynchronizedProperties, "Property", propertiyWithSynchronizedProperties.Identifier.Text, "Property");
-            }
-        }
-
-        private static void HandleUnsynchronizedPropertiesWithSynchronizedMethods(SyntaxNodeAnalysisContext context, HalfSynchronizedClassRepresentation halfSynchronizedClass)
-        {
-            var propertiesWithSynchronizedMethods = SynchronizationInspector.GetPropertiesWithSynchronizedMethods(halfSynchronizedClass);
-            foreach (var propertiyWithSynchronizedMethod in propertiesWithSynchronizedMethods)
-            {
-                ReportSynchronizationDiagnostic(context, propertiyWithSynchronizedMethod, "Property", propertiyWithSynchronizedMethod.Identifier.Text, "Method");
+                var method = (MethodDeclarationSyntax) root;
+                if (SynchronizationInspector.MethodHasHalfSynchronizedProperties(method, halfSynchronizedClass))
+                {
+                    var propUsed = SynchronizationInspector.GetHalSynchronizedPropertyUsed(halfSynchronizedClass, method);
+                    ReportHalfSynchronizationDiagnostic(context, method, "Property", propUsed.Identifier.Text);
+                }
             }
         }
 
         private static void ReportSynchronizationDiagnostic(SyntaxNodeAnalysisContext context,
-            CSharpSyntaxNode propertyDeclarationSyntax, string elementType, string elementTypeName, string synchronizedElement)
+            CSharpSyntaxNode propertyDeclarationSyntax, string elementType, string elementTypeName)
         {
-            object[] messageArguments = {elementType, elementTypeName, synchronizedElement};
+            object[] messageArguments = {elementType, elementTypeName};
             var diagnostic = Diagnostic.Create(Rule, propertyDeclarationSyntax.GetLocation(), messageArguments);
             context.ReportDiagnostic(diagnostic);
         }
@@ -128,6 +84,7 @@ namespace HalfSynchronizedChecker
         private static void ReportHalfSynchronizationDiagnostic(SyntaxNodeAnalysisContext context,
     CSharpSyntaxNode propertyDeclarationSyntax, string elementType, string elementTypeName)
         {
+
             object[] messageArguments = { elementType, elementTypeName };
             var diagnostic = Diagnostic.Create(RuleHalfSynchronized, propertyDeclarationSyntax.GetLocation(), messageArguments);
             context.ReportDiagnostic(diagnostic);

@@ -1,4 +1,5 @@
-﻿using System.Collections.Immutable;
+﻿using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Composition;
 using System.Linq;
 using System.Threading;
@@ -8,9 +9,6 @@ using Microsoft.CodeAnalysis.CodeFixes;
 using Microsoft.CodeAnalysis.CodeActions;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Editing;
-using Microsoft.CodeAnalysis.MSBuild;
-using Microsoft.CodeAnalysis.Rename;
 
 namespace HalfSynchronizedChecker
 {
@@ -19,7 +17,7 @@ namespace HalfSynchronizedChecker
     {
         private const string Title = "Synchronize Member";
 
-        public sealed override ImmutableArray<string> FixableDiagnosticIds => ImmutableArray.Create(HalfSynchronizedCheckerAnalyzer.DiagnosticId);
+        public sealed override ImmutableArray<string> FixableDiagnosticIds => ImmutableArray.Create(HalfSynchronizedCheckerAnalyzer.InnerLockingDiagnosticId, HalfSynchronizedCheckerAnalyzer.HalfSynchronizedChildDiagnosticId);
 
         public sealed override FixAllProvider GetFixAllProvider()
         {
@@ -30,7 +28,6 @@ namespace HalfSynchronizedChecker
         {
             var root = await context.Document.GetSyntaxRootAsync(context.CancellationToken).ConfigureAwait(false);
 
-            // TODO: Replace the following code with your own analysis, generating a CodeAction for each fix to suggest
             var diagnostic = context.Diagnostics.First();
             var diagnosticSpan = diagnostic.Location.SourceSpan;
 
@@ -38,22 +35,22 @@ namespace HalfSynchronizedChecker
             if (syntaxNode is MethodDeclarationSyntax)
             {
                 context.RegisterCodeFix(
-                    CodeAction.Create(Title, c => SynchronizeMethod(context.Document, (MethodDeclarationSyntax) syntaxNode, c), Title), diagnostic);
+                    CodeAction.Create(Title, c => SynchronizeMethod(context.Document, (MethodDeclarationSyntax) syntaxNode, c), Title), context.Diagnostics.First(a => a.Id == HalfSynchronizedCheckerAnalyzer.HalfSynchronizedChildDiagnosticId));
             }
-            if (syntaxNode is PropertyDeclarationSyntax)
+/*            if (syntaxNode is PropertyDeclarationSyntax)
             {
                 context.RegisterCodeFix(
-                    CodeAction.Create(Title, c => SynchronizeProperty(context.Document, (PropertyDeclarationSyntax)syntaxNode, c), Title), diagnostic);
-            }
+                    CodeAction.Create(Title, c => SynchronizeProperty(context.Document, (PropertyDeclarationSyntax) syntaxNode, c), equivalenceKey: Title), diagnostic);
+            }*/
         }
 
-        private async Task<Document> SynchronizeProperty(Document document, PropertyDeclarationSyntax property,
+        private static async Task<Document> SynchronizeProperty(Document document, PropertyDeclarationSyntax property,
     CancellationToken cancellationToken)
         {
             var x = property.AccessorList;
-            PropertyDeclarationSyntax blu = property;
+            var blu = property;
             var root = await document.GetSyntaxRootAsync(cancellationToken);
-            SyntaxList<AccessorDeclarationSyntax> newDecl = new SyntaxList<AccessorDeclarationSyntax>();
+            var newDecl = new SyntaxList<AccessorDeclarationSyntax>();
             foreach (var accessorDeclarationSyntax in x.Accessors)
             {
                 var openParans = SyntaxFactory.Token(SyntaxKind.OpenParenToken);
@@ -71,21 +68,23 @@ namespace HalfSynchronizedChecker
             return document.WithSyntaxRoot(root.ReplaceNode(property, blu));
         }
 
-        private async Task<Document> SynchronizeMethod(Document document, MethodDeclarationSyntax method,
+        private static async Task<Document> SynchronizeMethod(Document document, MethodDeclarationSyntax method,
             CancellationToken cancellationToken)
         {
             var root = await document.GetSyntaxRootAsync(cancellationToken);
-            var body = method.Body;
+            var body = method.Body.WithLeadingTrivia(SyntaxTriviaList.Create(SyntaxFactory.Tab));
             var openParans = SyntaxFactory.Token(SyntaxKind.OpenParenToken);
             var closingParans = SyntaxFactory.Token(SyntaxKind.CloseParenToken);
             var thisExpression = SyntaxFactory.ThisExpression();
             var lockStatement = SyntaxFactory.LockStatement(SyntaxFactory.Token(SyntaxKind.LockKeyword),
                 openParans,
                 thisExpression,
-                closingParans, body);
+                closingParans, body.WithoutLeadingTrivia());
             var l =
-                SyntaxFactory.Block(lockStatement);
+                SyntaxFactory.Block(lockStatement).WithoutLeadingTrivia();
+            l = l.ReplaceNode(thisExpression, thisExpression.WithLeadingTrivia());
             var newMeth = method.ReplaceNode(method, method.WithBody(l));
+            var x = newMeth.ToFullString();
             return document.WithSyntaxRoot(root.ReplaceNode(method, newMeth));
 
         }

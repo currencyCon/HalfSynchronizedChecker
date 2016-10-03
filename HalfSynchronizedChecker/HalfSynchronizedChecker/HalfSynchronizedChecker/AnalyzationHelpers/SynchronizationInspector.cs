@@ -6,69 +6,9 @@ namespace HalfSynchronizedChecker.AnalyzationHelpers
 {
     public class SynchronizationInspector
     {
-        public static IEnumerable<PropertyDeclarationSyntax> GetPropertiesWithSynchronizedMethods(HalfSynchronizedClassRepresentation halfSynchronizedClass)
-        {
-            var identifiersUsedInLockStatements =
-                SyntaxNodeFilter.GetIdentifiersInLockStatements(halfSynchronizedClass.SynchronizedMethods);
-            var propertiesWithSynchronizedMethods = new List<PropertyDeclarationSyntax>();
-            foreach (var propertyDeclarationSyntax in halfSynchronizedClass.UnsynchronizedProperties)
-            {
-                if (identifiersUsedInLockStatements.Any(e => e.Text == propertyDeclarationSyntax.Identifier.Text))
-                {
-                    propertiesWithSynchronizedMethods.Add(propertyDeclarationSyntax);
-                }
-            }
-            return propertiesWithSynchronizedMethods;
-        }
-
-        public static IEnumerable<PropertyDeclarationSyntax> GetPropertiesWithSynchronizedProperties(HalfSynchronizedClassRepresentation halfSynchronizedClass)
-        {
-            var identifiersUsedInLockStatements =
-                SyntaxNodeFilter.GetIdentifiersInLockStatements(halfSynchronizedClass.SynchronizedProperties);
-            var propertiesWithSynchronizedProperties = new List<PropertyDeclarationSyntax>();
-            foreach (var propertyDeclarationSyntax in halfSynchronizedClass.UnsynchronizedProperties)
-            {
-                if (identifiersUsedInLockStatements.Any(e => e.Text == propertyDeclarationSyntax.Identifier.Text))
-                {
-                    propertiesWithSynchronizedProperties.Add(propertyDeclarationSyntax);
-                }
-            }
-            return propertiesWithSynchronizedProperties;
-        }
-
-        public static IEnumerable<MethodDeclarationSyntax> GetMethodsWithSynchronizedProperties(HalfSynchronizedClassRepresentation halfSynchronizedClass)
-        {
-            var identifiersUsedInLockStatements =
-                SyntaxNodeFilter.GetIdentifiersInLockStatements(halfSynchronizedClass.SynchronizedProperties);
-            var methodsWithSynchronizedProperties = new List<MethodDeclarationSyntax>();
-            foreach (var methodDeclarationSyntax in halfSynchronizedClass.UnsynchronizedMethods)
-            {
-                if (identifiersUsedInLockStatements.Any(e => e.Text == methodDeclarationSyntax.Identifier.Text))
-                {
-                    methodsWithSynchronizedProperties.Add(methodDeclarationSyntax);
-                }
-            }
-            return methodsWithSynchronizedProperties;
-        }
-
-        public static IEnumerable<MethodDeclarationSyntax> GetMethodsWithSynchronizedMethods(HalfSynchronizedClassRepresentation halfSynchronizedClass)
-        {
-            var identifiersUsedInLockStatements =
-                SyntaxNodeFilter.GetIdentifiersInLockStatements(halfSynchronizedClass.SynchronizedMethods);
-            var methodsWithSynchronizedMethods = new List<MethodDeclarationSyntax>();
-            foreach (var methodDeclarationSyntax in halfSynchronizedClass.UnsynchronizedMethods)
-            {
-                if (identifiersUsedInLockStatements.Any(e => e.Text == methodDeclarationSyntax.Identifier.Text))
-                {
-                    methodsWithSynchronizedMethods.Add(methodDeclarationSyntax);
-                }
-            }
-            return methodsWithSynchronizedMethods;
-        }
-
         public static IEnumerable<MethodDeclarationSyntax> GetMethodsWithHalfSynchronizedProperties(HalfSynchronizedClassRepresentation halfSynchronizedClass)
         {
-            var methodsWithHalfSynchronizedProperties = new List<MethodDeclarationSyntax>();
+            var methodsWithHalfSynchronizedProperties = new List<MethodDeclarationSyntax>().ToList();
             foreach (var methodDeclarationSyntax in halfSynchronizedClass.UnsynchronizedMethods)
             {
                 var identifiersInMethods =
@@ -99,6 +39,18 @@ namespace HalfSynchronizedChecker.AnalyzationHelpers
                 halfSynchronizedClass.UnsynchronizedPropertiesInSynchronizedMethods.ToList()
                     .First(e => identifiersInMethods.Contains(e.Identifier.Text));
             return propUsed;
+        }
+
+        public static bool PropertyNeedsSynchronization(PropertyDeclarationSyntax propertyDeclaration, HalfSynchronizedClassRepresentation halfSynchronizedClass)
+        {
+            var identifiersInLockStatements = halfSynchronizedClass.GetIdentifiersInLockStatements();
+            return identifiersInLockStatements.Contains(propertyDeclaration.Identifier.Text);
+        }
+
+        public static bool MethodHasHalfSynchronizedProperties(MethodDeclarationSyntax method, HalfSynchronizedClassRepresentation halfSynchronizedClass)
+        {
+            var methodsWithHalfSynchronizedProperties = GetMethodsWithHalfSynchronizedProperties(halfSynchronizedClass);
+            return methodsWithHalfSynchronizedProperties.Select(e => e.Identifier.Text).Contains(method.Identifier.Text);
         }
     }
 }

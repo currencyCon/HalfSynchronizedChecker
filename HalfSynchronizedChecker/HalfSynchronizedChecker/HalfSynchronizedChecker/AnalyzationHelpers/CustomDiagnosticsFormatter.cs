@@ -10,7 +10,7 @@ namespace HalfSynchronizedChecker.AnalyzationHelpers
             var index = kindText.IndexOf(DeclarationSubString);
             return index < 0
                 ? kindText
-                : kindText.Remove(index, kindText.Length);
+                : kindText.Remove(index, DeclarationSubString.Length);
 
         }
     }
