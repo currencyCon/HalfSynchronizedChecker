@@ -13,17 +13,21 @@ namespace HalfSynchronizedChecker
     {
         public const string InnerLockingDiagnosticId = "HSC001";
         public const string HalfSynchronizedChildDiagnosticId = "HSC002";
+        public const string UnsynchronizedPropertyId = "HSC000";
+
         private static readonly LocalizableString Title = new LocalizableResourceString(nameof(Resources.AnalyzerTitle), Resources.ResourceManager, typeof(Resources));
         private static readonly LocalizableString MessageFormat = new LocalizableResourceString(nameof(Resources.AnalyzerMessageFormat), Resources.ResourceManager, typeof(Resources));
         private static readonly LocalizableString MessageFormatHalfSynchronized = new LocalizableResourceString(nameof(Resources.AnalyzerMessageFormatHalfSynchronized), Resources.ResourceManager, typeof(Resources));
-
+        private static readonly LocalizableString MessageFormatUnsychronizedProperty = new LocalizableResourceString(nameof(Resources.AnalyzerMessageFormatUnsynchronizedProperty), Resources.ResourceManager, typeof(Resources));
         private static readonly LocalizableString Description = new LocalizableResourceString(nameof(Resources.AnalyzerDescription), Resources.ResourceManager, typeof(Resources));
         private const string Category = "Synchronization";
 
         private static readonly DiagnosticDescriptor Rule = new DiagnosticDescriptor(InnerLockingDiagnosticId, Title, MessageFormat, Category, DiagnosticSeverity.Warning, isEnabledByDefault: true, description: Description);
         private static readonly DiagnosticDescriptor RuleHalfSynchronized = new DiagnosticDescriptor(HalfSynchronizedChildDiagnosticId, Title, MessageFormatHalfSynchronized, Category, DiagnosticSeverity.Warning, isEnabledByDefault: true, description: Description);
+        private static readonly DiagnosticDescriptor RuleUnsynchronizedProperty = new DiagnosticDescriptor(UnsynchronizedPropertyId, Title, MessageFormatUnsychronizedProperty, Category, DiagnosticSeverity.Warning, isEnabledByDefault:true, description: Description);
 
-        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => ImmutableArray.Create(Rule, RuleHalfSynchronized);
+        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics
+            => ImmutableArray.Create(Rule, RuleHalfSynchronized, RuleUnsynchronizedProperty);//, RuleUnsynchronizedProperty);
 
         public override void Initialize(AnalysisContext context)
         {
@@ -57,7 +61,7 @@ namespace HalfSynchronizedChecker
                 if (SynchronizationInspector.PropertyNeedsSynchronization(property,
                     halfSynchronizedClass))
                 {
-                    ReportSynchronizationDiagnostic(context, property, "Property", property.Identifier.Text);
+                    ReportUnsynchronizationPropertyDiagnostic(context, property, "Property", property.Identifier.Text);
 
                 }
             }
@@ -70,6 +74,14 @@ namespace HalfSynchronizedChecker
                     ReportHalfSynchronizationDiagnostic(context, method, "Property", propUsed.Identifier.Text);
                 }
             }
+        }
+
+        private static void ReportUnsynchronizationPropertyDiagnostic(SyntaxNodeAnalysisContext context,
+    CSharpSyntaxNode propertyDeclarationSyntax, string elementType, string elementTypeName)
+        {
+            object[] messageArguments = { elementType, elementTypeName };
+            var diagnostic = Diagnostic.Create(RuleUnsynchronizedProperty, propertyDeclarationSyntax.GetLocation());
+            context.ReportDiagnostic(diagnostic);
         }
 
         private static void ReportSynchronizationDiagnostic(SyntaxNodeAnalysisContext context,

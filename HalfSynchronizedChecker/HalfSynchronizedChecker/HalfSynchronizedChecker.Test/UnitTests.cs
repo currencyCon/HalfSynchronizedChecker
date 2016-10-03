@@ -10,6 +10,7 @@ namespace HalfSynchronizedChecker.Test
     public class UnitTest : CodeFixVerifier
     {
 
+
         [TestMethod]
         public void TestDetectsUnsynchronizedProperty()
         {
@@ -32,8 +33,8 @@ namespace HalfSynchronizedChecker.Test
             ";
             var expected = new DiagnosticResult
             {
-                Id = HalfSynchronizedCheckerAnalyzer.InnerLockingDiagnosticId,
-                Message = "The Property z is used in a synchronized member. Consider synchronizing it.",
+                Id = HalfSynchronizedCheckerAnalyzer.UnsynchronizedPropertyId,
+                Message = "The Property is used in a synchronized Member. Consider synchronizing it.",
                 Severity = DiagnosticSeverity.Warning,
                 Locations =
                     new[] {
@@ -70,8 +71,8 @@ namespace HalfSynchronizedChecker.Test
             var expected = new [] {
                 new DiagnosticResult
             {
-                Id = HalfSynchronizedCheckerAnalyzer.InnerLockingDiagnosticId,
-                Message = "The Property z is used in a synchronized member. Consider synchronizing it.",
+                Id = HalfSynchronizedCheckerAnalyzer.UnsynchronizedPropertyId,
+                Message = "The Property is used in a synchronized Member. Consider synchronizing it.",
                 Severity = DiagnosticSeverity.Warning,
                 Locations =
                     new[] {
@@ -104,10 +105,9 @@ namespace Test
     {
         public int z { get; set; }
 
-
         public void m()
         {
-            lock(this)
+            lock (this)
             {
                 z = 2;
             }
@@ -129,14 +129,15 @@ namespace Test
 
         public void m()
         {
-            lock(this)
+            lock (this)
             {
                 z = 2;
             }
         }
 
-        public void m2() {
-            lock(this)
+        public void m2()
+        {
+            lock (this)
             {
                 z = 3;
             }
@@ -145,6 +146,68 @@ namespace Test
 }
 ";
             VerifyCSharpFix(test, fixTest, warningId:HalfSynchronizedCheckerAnalyzer.HalfSynchronizedChildDiagnosticId);
+        }
+
+
+        [TestMethod]
+        public void TestProvidesSimpleUnsynchronizedPropertyFix()
+        {
+            const string test =
+@"
+namespace Test
+{
+    class TestProgram
+    {
+        public int z { get; set; }
+
+        public void m()
+        {
+            lock (this)
+            {
+                z = 2;
+            }
+        }
+    }
+}
+";
+            const string fixTest =
+@"
+namespace Test
+{
+    class TestProgram
+    {
+        private int _z;
+
+        public int z
+        {
+            get
+            {
+                lock (this)
+                {
+                    return _z;
+                }
+            }
+
+            set
+            {
+                lock (this)
+                {
+                    _z = value;
+                }
+            }
+        }
+
+        public void m()
+        {
+            lock (this)
+            {
+                z = 2;
+            }
+        }
+    }
+}
+";
+            VerifyCSharpFix(test, fixTest, warningId: HalfSynchronizedCheckerAnalyzer.UnsynchronizedPropertyId);
         }
         protected override CodeFixProvider GetCSharpCodeFixProvider()
         {

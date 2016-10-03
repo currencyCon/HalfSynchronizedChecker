@@ -1,8 +1,8 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011" xmlns:d="http://schemas.microsoft.com/developer/vsx-schema-design/2011">
   <Metadata>
-    <Identity Id="HalfSynchronizedChecker..2de76445-f9f0-46f3-a9b3-d890386c32ed" Version="1.7" Language="en-US" Publisher="rafae"/>
-    <DisplayName>HalfSynchronizedChecker</DisplayName>
+    <Identity Id="NestedLockingAnalyzer..c789a208-ac44-49c7-866b-ae044956b9d5" Version="1.0" Language="en-US" Publisher="rafae"/>
+    <DisplayName>NestedLockingAnalyzer</DisplayName>
     <Description xml:space="preserve">This is a sample diagnostic extension for the .NET Compiler Platform ("Roslyn").</Description>
   </Metadata>
   <Installation>
@@ -12,7 +12,7 @@
     <Dependency Id="Microsoft.Framework.NDP" DisplayName="Microsoft .NET Framework" d:Source="Manual" Version="[4.5,)" />
   </Dependencies>
   <Assets>
-    <Asset Type="Microsoft.VisualStudio.MefComponent" d:Source="Project" d:ProjectName="HalfSynchronizedChecker" Path="|HalfSynchronizedChecker|"/>
-    <Asset Type="Microsoft.VisualStudio.Analyzer" d:Source="Project" d:ProjectName="HalfSynchronizedChecker" Path="|HalfSynchronizedChecker|"/>
+    <Asset Type="Microsoft.VisualStudio.MefComponent" d:Source="Project" d:ProjectName="NestedLockingAnalyzer" Path="|NestedLockingAnalyzer|"/>
+    <Asset Type="Microsoft.VisualStudio.Analyzer" d:Source="Project" d:ProjectName="NestedLockingAnalyzer" Path="|NestedLockingAnalyzer|"/>
   </Assets>
 </PackageManifest>
