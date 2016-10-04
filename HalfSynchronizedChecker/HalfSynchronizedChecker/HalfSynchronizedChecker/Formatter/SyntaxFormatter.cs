@@ -27,14 +27,14 @@ namespace HalfSynchronizedChecker.Formatter
         public static SyntaxToken AddIndention(SyntaxToken closeBraceToken, int level)
         {
             IEnumerable<SyntaxTrivia> indention = closeBraceToken.LeadingTrivia.ToList();
-            indention = SyntaxFormatter.AddIndention(level, indention);
+            indention = AddIndention(level, indention);
             return closeBraceToken.WithLeadingTrivia(indention);
         }
 
         public static StatementSyntax AddIndention(StatementSyntax statementSyntax, int level)
         {
             IEnumerable<SyntaxTrivia> indention = statementSyntax.GetLeadingTrivia().ToList();
-            indention = AddIndention((SyntaxToken) level, (int) indention);
+            indention = AddIndention( level, indention);
             return statementSyntax.WithLeadingTrivia(indention);
         }
     }
