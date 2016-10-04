@@ -43,8 +43,37 @@ namespace HalfSynchronizedChecker.AnalyzationHelpers
 
         public static bool PropertyNeedsSynchronization(PropertyDeclarationSyntax propertyDeclaration, HalfSynchronizedClassRepresentation halfSynchronizedClass)
         {
+            if (PropertyIsSynchronized(propertyDeclaration))
+            {
+                return false;
+            }
             var identifiersInLockStatements = halfSynchronizedClass.GetIdentifiersInLockStatements();
             return identifiersInLockStatements.Contains(propertyDeclaration.Identifier.Text);
+            
+        }
+
+        private static bool PropertyIsSynchronized(BasePropertyDeclarationSyntax propertyDeclaration)
+        {
+            var hasNullBodies = propertyDeclaration.AccessorList.Accessors.Any(e => e.Body == null);
+            if (hasNullBodies)
+            {
+                return false;
+            }
+            return AccessorsAreSynchronized(propertyDeclaration);
+        }
+
+        private static bool AccessorsAreSynchronized(BasePropertyDeclarationSyntax propertyDeclaration)
+        {
+            var allAccessorsSynchronized = true;
+            foreach (var accessorDeclarationSyntax in propertyDeclaration.AccessorList.Accessors)
+            {
+                var childrenOfAccessor = accessorDeclarationSyntax.Body.ChildNodes().ToList();
+                if (childrenOfAccessor.Count > 1 || !(childrenOfAccessor.FirstOrDefault() is LockStatementSyntax))
+                {
+                    allAccessorsSynchronized = false;
+                }
+            }
+            return allAccessorsSynchronized;
         }
 
         public static bool MethodHasHalfSynchronizedProperties(MethodDeclarationSyntax method, HalfSynchronizedClassRepresentation halfSynchronizedClass)

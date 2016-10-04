@@ -10,9 +10,95 @@ namespace HalfSynchronizedChecker.Test
     public class UnitTest : CodeFixVerifier
     {
 
+        [TestMethod]
+        public void TestDetectsNoFalsePositiveOnSynchronizedProperty()
+        {
+            const string test = @"
+                namespace bla {
+                    class Program
+                    {
+                        private int _z;
+
+                        public int z
+                        {
+                            get
+                            {
+                                lock (this)
+                                {
+                                    return _z;
+                                }
+                            }
+
+                            set
+                            {
+                                lock (this)
+                                {
+                                    _z = value;
+                                }
+                            }
+                        }
+
+                        public void m()
+                        {
+                            lock(this)
+                            {
+                                z = 2;
+                            }
+                        }
+                    }
+                }";
+            VerifyCSharpDiagnostic(test);
+
+        }
 
         [TestMethod]
         public void TestDetectsUnsynchronizedProperty()
+        {
+            const string test = @"
+                namespace bla {
+                    class Program
+                    {
+                        private int _z;
+
+                        public int z
+                        {
+                            get
+                            {
+                                return _z;
+                            }
+
+                            set
+                            {
+                                lock (this)
+                                {
+                                    _z = value;
+                                }
+                            }
+                        }
+
+                        public void m()
+                        {
+                            lock(this)
+                            {
+                                z = 2;
+                            }
+                        }
+                    }
+                }";
+            var expected = new DiagnosticResult
+            {
+                Id = HalfSynchronizedCheckerAnalyzer.UnsynchronizedPropertyId,
+                Message = "The Property is used in a synchronized Member. Consider synchronizing it.",
+                Severity = DiagnosticSeverity.Warning,
+                Locations = new[] {
+                    new DiagnosticResultLocation("Test0.cs", 7, 25)
+                }
+            };
+
+            VerifyCSharpDiagnostic(test, expected);
+        }
+        [TestMethod]
+        public void TestDetectsUnsynchronizedPropertySimpleCase()
         {
             const string test = @"
                 namespace Test

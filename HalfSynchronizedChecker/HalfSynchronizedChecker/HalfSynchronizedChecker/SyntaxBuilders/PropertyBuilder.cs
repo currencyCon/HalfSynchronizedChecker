@@ -45,7 +45,7 @@ namespace HalfSynchronizedChecker.SyntaxBuilders
             var synchronizedProperty  =
                 SyntaxFactory.PropertyDeclaration(property.Type, property.Identifier.Text)
                     .AddModifiers(SyntaxFactory.Token(SyntaxKind.PublicKeyword).WithTrailingTrivia(SyntaxTriviaList.Create(SyntaxFactory.Space)))
-                    .AddAccessorListAccessors(PropertyBuilder.GetDefaultGetter(backingField), PropertyBuilder.GetDefaultSetter(backingField)
+                    .AddAccessorListAccessors(GetDefaultGetter(backingField), GetDefaultSetter(backingField)
                     );
             return synchronizedProperty;
         }

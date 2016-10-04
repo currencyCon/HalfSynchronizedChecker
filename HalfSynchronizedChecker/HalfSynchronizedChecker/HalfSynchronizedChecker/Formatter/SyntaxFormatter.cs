@@ -6,7 +6,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace HalfSynchronizedChecker.Formatter
 {
-    class SyntaxFormatter
+    public class SyntaxFormatter
     {
         private static IEnumerable<SyntaxTrivia> AddIndention(int level, IEnumerable<SyntaxTrivia> indention)
         {
